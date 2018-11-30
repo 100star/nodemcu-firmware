@@ -20,35 +20,37 @@ FLAVOR = debug
 ifndef PDIR # {
 GEN_IMAGES= eagle.app.v6.out
 GEN_BINS= eagle.app.v6.bin
-SPECIAL_MKTARGETS=$(APP_MKTARGETS)
+OPT_MKTARGETS        := coap crypto dht http mqtt pcm sjson sqlite3 tsl2561 websocket
+OPT_MKLIBTARGETS     := u8g2 ucg
+SEL_MKTARGETS        := $(shell $(CC) -E -dM include/user_modules.h | sed -n '/^\#define LUA_USE_MODULES_/{s/.\{24\}\(.*\)/\L\1/; p}')
+OPT_SEL_MKLIBTARGETS := $(foreach tgt,$(OPT_MKLIBTARGETS),$(findstring $(tgt), $(SEL_MKTARGETS)))
+OPT_SEL_MKTARGETS    := $(foreach tgt,$(OPT_MKTARGETS),$(findstring $(tgt), $(SEL_MKTARGETS))) \
+                        $(foreach tgt,$(OPT_SEL_MKLIBTARGETS),$(tgt)lib)
+OPT_SEL_COMPONENTS   := $(foreach tgt,$(OPT_SEL_MKTARGETS),$(tgt)/lib$(tgt).a)
+SPECIAL_MKTARGETS    :=$(APP_MKTARGETS)
+
 SUBDIRS= 					\
 	user 					\
 	driver 					\
-	json 					\
-	upgrade 				\
+	mbedtls 				\
 	platform 				\
 	libc 					\
 	lua 					\
 	lwip 					\
-	coap 					\
-	mqtt 					\
-	u8glib 					\
-	ucglib					\
+	task 					\
 	smart 					\
-	wofs 					\
 	modules 				\
 	spiffs 					\
-	cjson 					\
-	crypto 					\
-	dhtlib					\
-	tsl2561
+	net					\
+	fatfs					\
+	esp-gdbstub				\
+	pm					\
+	$(OPT_SEL_MKTARGETS)
 
 endif # } PDIR
 
 APPDIR = .
 LDDIR = ../ld
-
-CCFLAGS += -Os
 
 TARGET_LDFLAGS = 				\
 	-nostdlib 				\
@@ -56,38 +58,32 @@ TARGET_LDFLAGS = 				\
 	--longcalls 				\
 	--text-section-literals
 
-ifeq ($(FLAVOR),debug)
-    TARGET_LDFLAGS += -g -Os
-endif
-
-ifeq ($(FLAVOR),release)
-    TARGET_LDFLAGS += -Os
-endif
-
 LD_FILE = $(LDDIR)/nodemcu.ld
 
 COMPONENTS_eagle.app.v6 = 			\
 	user/libuser.a 				\
 	driver/libdriver.a 			\
-	json/libjson.a 				\
-	upgrade/libupgrade.a 			\
 	platform/libplatform.a 			\
+	task/libtask.a 				\
 	libc/liblibc.a 				\
 	lua/liblua.a 				\
 	lwip/liblwip.a 				\
-	coap/coap.a 				\
-	mqtt/mqtt.a 				\
-	u8glib/u8glib.a 			\
-	ucglib/ucglib.a 			\
 	smart/smart.a 				\
-	wofs/wofs.a 				\
 	spiffs/spiffs.a 			\
-	cjson/libcjson.a 			\
-	crypto/libcrypto.a 			\
-	dhtlib/libdhtlib.a 			\
-	tsl2561/tsl2561lib.a			\
-	modules/libmodules.a		
+	fatfs/libfatfs.a			\
+	pm/libpm.a				\
+	esp-gdbstub/libgdbstub.a		\
+	net/libnodemcu_net.a			\
+	mbedtls/libmbedtls.a      		\
+	modules/libmodules.a			\
+	$(OPT_SEL_COMPONENTS)
 
+
+# Inspect the modules library and work out which modules need to be linked.
+# For each enabled module, a symbol name of the form XYZ_module_selected is
+# returned. At link time those names are declared undefined, so those (and
+# only those) modules are pulled in.
+SELECTED_MODULE_SYMS=$(filter %_module_selected %module_selected1,$(shell $(NM) modules/.output/$(TARGET)/$(FLAVOR)/lib/libmodules.a))
 
 LINKFLAGS_eagle.app.v6 = 			\
 	-Wl,--gc-sections 			\
@@ -98,7 +94,9 @@ LINKFLAGS_eagle.app.v6 = 			\
 	-Wl,--no-check-sections 		\
 	-Wl,--wrap=_xtos_set_exception_handler	\
 	-Wl,-static 				\
+	$(addprefix -u , $(SELECTED_MODULE_SYMS)) \
 	-Wl,--start-group 			\
+	-lmain 					\
 	-lc 					\
 	-lgcc 					\
 	-lhal 					\
@@ -106,10 +104,10 @@ LINKFLAGS_eagle.app.v6 = 			\
 	-lpp 					\
 	-lnet80211 				\
 	-lwpa 					\
-	-lmain 					\
-	-ljson 					\
+	-lwpa2					\
 	-lsmartconfig 				\
-	-lssl 					\
+	-lcrypto				\
+	-lwps					\
 	$(DEP_LIBS_eagle.app.v6) 		\
 	-Wl,--end-group 			\
 	-lm
@@ -134,9 +132,13 @@ DEPENDS_eagle.app.v6 = 				\
 #	-DWLAN_CONFIG_CCX
 CONFIGURATION_DEFINES =	-D__ets__ 		\
 			-DICACHE_FLASH 		\
+			-DLUA_OPTIMIZE_MEMORY=2	\
+			-DMIN_OPT_LEVEL=2	\
 			-DLWIP_OPEN_SRC 	\
 			-DPBUF_RSV_FOR_WLAN 	\
-			-DEBUF_LWIP
+			-DEBUF_LWIP		\
+			-DUSE_OPTIMIZE_PRINTF	\
+			-DMBEDTLS_USER_CONFIG_FILE=\"user_mbedtls.h\"  \
 
 DEFINES += 					\
 	$(UNIVERSAL_TARGET_DEFINES) 		\
@@ -163,7 +165,6 @@ INCLUDES := $(INCLUDES) -I $(PDIR)include
 INCLUDES += -I ./
 PDIR := ../$(PDIR)
 sinclude $(PDIR)Makefile
-
 
 .PHONY: FORCE
 FORCE:

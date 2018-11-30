@@ -12,8 +12,11 @@
 #     a generated lib/image xxx.a ()
 #
 ifndef PDIR
+SUBDIRS = luac_cross
 GEN_LIBS = liblua.a
 endif
+
+STD_CFLAGS=-std=gnu11 -Wimplicit
 
 #############################################################
 # Configuration i.e. compile options etc.
@@ -22,7 +25,8 @@ endif
 #   makefile at its root level - these are then overridden
 #   for a subtree within the makefile rooted therein
 #
-#DEFINES += 
+#DEFINES += -DDEVELOPMENT_TOOLS -DDEVELOPMENT_USE_GDB -DDEVELOPMENT_BREAK_ON_STARTUP_PIN=1
+#EXTRA_CCFLAGS += -ggdb -O0
 
 #############################################################
 # Recursion Magic - Don't touch this!!
@@ -38,7 +42,6 @@ endif
 
 INCLUDES := $(INCLUDES) -I $(PDIR)include
 INCLUDES += -I ./
-INCLUDES += -I ../wofs
 INCLUDES += -I ../spiffs
 INCLUDES += -I ../libc
 INCLUDES += -I ../modules

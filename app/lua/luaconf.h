@@ -38,6 +38,11 @@
 #define LUA_WIN
 #endif
 
+
+#if defined(LUA_CROSS_COMPILER)
+#define LUA_USE_LINUX
+#endif
+
 #if defined(LUA_USE_LINUX)
 #define LUA_USE_POSIX
 #define LUA_USE_DLOPEN		/* needs an extra library: -ldl */
@@ -59,7 +64,7 @@
 #if defined(LUA_USE_POSIX)
 #define LUA_USE_MKSTEMP
 #define LUA_USE_ISATTY
-#define LUA_USE_POPEN
+//#define LUA_USE_POPEN
 #define LUA_USE_ULONGJMP
 #endif
 
@@ -167,7 +172,7 @@
 #define LUA_INTEGER ptrdiff_t
 #else
   #if !defined LUA_INTEGRAL_LONGLONG
-  #define LUA_INTEGER	long
+  #define LUA_INTEGER	int
   #else
   #define LUA_INTEGER long long
   #endif // #if !defined LUA_INTEGRAL_LONGLONG
@@ -346,7 +351,7 @@ extern int readline4lua(const char *prompt, char *buffer, int length);
 ** (A format string with one argument is enough for Lua...)
 */
 #if !defined(LUA_USE_STDIO)
-#define luai_writestringerror(s,p)	c_printf((s), (p))
+#define luai_writestringerror(s,p)	dbg_printf((s), (p))
 #endif // defined(LUA_USE_STDIO)
 
 
@@ -487,7 +492,7 @@ extern int readline4lua(const char *prompt, char *buffer, int length);
 /* 16-bit ints */
 #define LUAI_UINT32	unsigned long
 #define LUAI_INT32	long
-#define LUAI_MAXINT32	LONG_MAX
+#define LUAI_MAXINT32	INT_MAX
 #define LUAI_UMEM	unsigned long
 #define LUAI_MEM	long
 #endif
@@ -556,7 +561,7 @@ extern int readline4lua(const char *prompt, char *buffer, int length);
 ** For example: If set to 4K a call to string.gsub will need more than 
 ** 5k C stack space.
 */
-#define LUAL_BUFFERSIZE		BUFSIZ
+#define LUAL_BUFFERSIZE		256
 
 /* }================================================================== */
 
@@ -607,8 +612,8 @@ extern int readline4lua(const char *prompt, char *buffer, int length);
 */
 #if defined LUA_NUMBER_INTEGRAL
   #if !defined LUA_INTEGRAL_LONGLONG
-  #define LUA_NUMBER_SCAN		"%ld"
-  #define LUA_NUMBER_FMT		"%ld"
+  #define LUA_NUMBER_SCAN		"%d"
+  #define LUA_NUMBER_FMT		"%d"
   #else
   #define LUA_NUMBER_SCAN   "%lld"
   #define LUA_NUMBER_FMT    "%lld"
@@ -632,7 +637,7 @@ extern int readline4lua(const char *prompt, char *buffer, int length);
 /*
 @@ The luai_num* macros define the primitive operations over numbers.
 */
-#if defined(LUA_CORE)
+#if defined(LUA_CORE) || defined(LUA_LIB)
 #ifdef LUA_CROSS_COMPILER
 #include <math.h>
 #else
@@ -880,10 +885,6 @@ union luai_Cast { double l_d; long l_l; };
 
 #define LUA_INTFRMLEN		"l"
 #define LUA_INTFRM_T		long
-#ifndef LUA_CROSS_COMPILER
-typedef short int16_t;
-typedef long int32_t;
-#endif
 #endif
 
 
@@ -898,7 +899,7 @@ typedef long int32_t;
 /* If you define the next macro you'll get the ability to set rotables as
    metatables for tables/userdata/types (but the VM might run slower)
 */
-#if (LUA_OPTIMIZE_MEMORY == 2) && !defined(LUA_CROSS_COMPILER)
+#if (LUA_OPTIMIZE_MEMORY == 2)
 #define LUA_META_ROTABLES 
 #endif
 

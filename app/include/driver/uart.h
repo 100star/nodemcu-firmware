@@ -17,20 +17,20 @@ typedef enum {
 } UartBitsNum4Char;
 
 typedef enum {
-    ONE_STOP_BIT             = 0,
-    ONE_HALF_STOP_BIT        = BIT2,
-    TWO_STOP_BIT             = BIT2
+    ONE_STOP_BIT             = 0x1,
+    ONE_HALF_STOP_BIT        = 0x2,
+    TWO_STOP_BIT             = 0x3
 } UartStopBitsNum;
 
 typedef enum {
-    NONE_BITS = 0,
-    ODD_BITS   = 0,
-    EVEN_BITS = BIT4
+    NONE_BITS = 0x2,
+    ODD_BITS   = 1,
+    EVEN_BITS = 0
 } UartParityMode;
 
 typedef enum {
     STICK_PARITY_DIS   = 0,
-    STICK_PARITY_EN    = BIT3 | BIT5
+    STICK_PARITY_EN    = 1
 } UartExistParity;
 
 typedef enum {
@@ -41,6 +41,7 @@ typedef enum {
     BIT_RATE_4800    = 4800,
     BIT_RATE_9600    = 9600,
     BIT_RATE_19200   = 19200,
+    BIT_RATE_31250   = 31250,
     BIT_RATE_38400   = 38400,
     BIT_RATE_57600   = 57600,
     BIT_RATE_74880   = 74880,
@@ -101,12 +102,22 @@ typedef struct {
     int                      buff_uart_no;  //indicate which uart use tx/rx buffer
 } UartDevice;
 
-void uart_init(UartBautRate uart0_br, UartBautRate uart1_br, uint8 task_prio, os_signal_t sig_input);
+typedef struct {
+    UartBautRate      baut_rate;
+    UartBitsNum4Char  data_bits;
+    UartExistParity   exist_parity;
+    UartParityMode    parity;   
+    UartStopBitsNum   stop_bits;
+} UartConfig;
+
+void uart_init(UartBautRate uart0_br, UartBautRate uart1_br, os_signal_t sig_input, uint8 *flag_input);
+UartConfig uart_get_config(uint8 uart_no);
 void uart0_alt(uint8 on);
 void uart0_sendStr(const char *str);
 void uart0_putc(const char c);
 void uart0_tx_buffer(uint8 *buf, uint16 len);
 void uart_setup(uint8 uart_no);
 STATUS uart_tx_one_char(uint8 uart, uint8 TxChar);
+void uart_set_alt_output_uart0(void (*fn)(char));
 #endif
 

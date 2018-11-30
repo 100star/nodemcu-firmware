@@ -10,6 +10,8 @@
 #include "c_stddef.h"
 #include "mem.h"
 
+#include <stdlib.h>
+
 #define EXIT_FAILURE 1
 #define EXIT_SUCCESS 0
 
@@ -44,8 +46,7 @@
 
 // void c_exit(int);
 
-// c_getenv() get env "LUA_INIT" string for lua initialization.
-const char *c_getenv(const char *__string);
+//const char *c_getenv(const char *__string);
 
 // void *c_malloc(size_t __size);
 // void *c_zalloc(size_t __size);

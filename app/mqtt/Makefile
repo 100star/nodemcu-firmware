@@ -12,8 +12,10 @@
 #     a generated lib/image xxx.a ()
 #
 ifndef PDIR
-GEN_LIBS = mqtt.a
+GEN_LIBS = libmqtt.a
 endif
+
+STD_CFLAGS=-std=gnu11 -Wimplicit
 
 #############################################################
 # Configuration i.e. compile options etc.

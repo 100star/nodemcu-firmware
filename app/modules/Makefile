@@ -15,6 +15,8 @@ ifndef PDIR
 GEN_LIBS = libmodules.a
 endif
 
+STD_CFLAGS=-std=gnu11 -Wimplicit
+
 #############################################################
 # Configuration i.e. compile options etc.
 # Target specific stuff (defines etc.) goes in here!
@@ -41,15 +43,20 @@ INCLUDES += -I ./
 INCLUDES += -I ../libc
 INCLUDES += -I ../coap
 INCLUDES += -I ../mqtt
-INCLUDES += -I ../u8glib
+INCLUDES += -I ../u8g2lib/u8g2/src/clib
 INCLUDES += -I ../ucglib
 INCLUDES += -I ../lua
+INCLUDES += -I ../pcm
 INCLUDES += -I ../platform
-INCLUDES += -I ../wofs
 INCLUDES += -I ../spiffs
 INCLUDES += -I ../smart
-INCLUDES += -I ../cjson
-INCLUDES += -I ../dhtlib
+INCLUDES += -I ../dht
+INCLUDES += -I ../fatfs
+INCLUDES += -I ../http
+INCLUDES += -I ../sjson
+INCLUDES += -I ../websocket
+INCLUDES += -I ../pm
+INCLUDES += -I ../sqlite3
 PDIR := ../$(PDIR)
 sinclude $(PDIR)Makefile
 

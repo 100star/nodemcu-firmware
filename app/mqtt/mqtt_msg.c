@@ -162,7 +162,7 @@ const char* mqtt_get_publish_topic(uint8_t* buffer, uint16_t* length)
   }
   totlen += i;
 
-  if(i + 2 >= *length)
+  if(i + 2 > *length)
     return NULL;
   topiclen = buffer[i++] << 8;
   topiclen |= buffer[i++];
@@ -191,12 +191,12 @@ const char* mqtt_get_publish_data(uint8_t* buffer, uint16_t* length)
   }
   totlen += i;
 
-  if(i + 2 >= *length)
+  if(i + 2 > *length)
     return NULL;
   topiclen = buffer[i++] << 8;
   topiclen |= buffer[i++];
 
-  if(i + topiclen >= *length){
+  if(i + topiclen > *length){
 	*length = 0;
     return NULL;
   }
@@ -204,7 +204,7 @@ const char* mqtt_get_publish_data(uint8_t* buffer, uint16_t* length)
 
   if(mqtt_get_qos(buffer) > 0)
   {
-    if(i + 2 >= *length)
+    if(i + 2 > *length)
       return NULL;
     i += 2;
   }
@@ -231,6 +231,9 @@ uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length)
       int i;
       int topiclen;
 
+      if(mqtt_get_qos(buffer) <= 0)
+        return 0;
+
       for(i = 1; i < length; ++i)
       {
         if((buffer[i] & 0x80) == 0)
@@ -240,23 +243,17 @@ uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length)
         }
       }
 
-      if(i + 2 >= length)
+      if(i + 2 > length)
         return 0;
       topiclen = buffer[i++] << 8;
       topiclen |= buffer[i++];
 
-      if(i + topiclen >= length)
+      if(i + topiclen > length)
         return 0;
       i += topiclen;
 
-      if(mqtt_get_qos(buffer) > 0)
-      {
-        if(i + 2 >= length)
-          return 0;
-        //i += 2;
-      } else {
-    	  return 0;
-      }
+      if(i + 2 > length)
+        return 0;
 
       return (buffer[i] << 8) | buffer[i + 1];
     }
@@ -402,14 +399,19 @@ mqtt_message_t* mqtt_msg_pubcomp(mqtt_connection_t* connection, uint16_t message
   return fini_message(connection, MQTT_MSG_TYPE_PUBCOMP, 0, 0, 0);
 }
 
-mqtt_message_t* mqtt_msg_subscribe(mqtt_connection_t* connection, const char* topic, int qos, uint16_t* message_id)
+mqtt_message_t* mqtt_msg_subscribe_init(mqtt_connection_t* connection, uint16_t *message_id)
 {
   init_message(connection);
 
-  if(topic == NULL || topic[0] == '\0')
+  if((*message_id = append_message_id(connection, 0)) == 0)
     return fail_message(connection);
 
-  if((*message_id = append_message_id(connection, 0)) == 0)
+  return &connection->message;
+}
+
+mqtt_message_t* mqtt_msg_subscribe_topic(mqtt_connection_t* connection, const char* topic, int qos)
+{
+  if(topic == NULL || topic[0] == '\0')
     return fail_message(connection);
 
   if(append_string(connection, topic, c_strlen(topic)) < 0)
@@ -419,23 +421,63 @@ mqtt_message_t* mqtt_msg_subscribe(mqtt_connection_t* connection, const char* to
     return fail_message(connection);
   connection->buffer[connection->message.length++] = qos;
 
+  return &connection->message;
+}
+
+mqtt_message_t* mqtt_msg_subscribe_fini(mqtt_connection_t* connection)
+{
   return fini_message(connection, MQTT_MSG_TYPE_SUBSCRIBE, 0, 1, 0);
 }
 
-mqtt_message_t* mqtt_msg_unsubscribe(mqtt_connection_t* connection, const char* topic, uint16_t* message_id)
+mqtt_message_t* mqtt_msg_subscribe(mqtt_connection_t* connection, const char* topic, int qos, uint16_t* message_id)
 {
-  init_message(connection);
+  mqtt_message_t* result;
+  
+  result = mqtt_msg_subscribe_init(connection, message_id);
+  if (result->length != 0) {
+    result = mqtt_msg_subscribe_topic(connection, topic, qos);
+  }
+  if (result->length != 0) {
+    result = mqtt_msg_subscribe_fini(connection);
+  }
 
+  return result;
+}
+
+mqtt_message_t* mqtt_msg_unsubscribe_init(mqtt_connection_t* connection, uint16_t *message_id)
+{
+  return mqtt_msg_subscribe_init(connection, message_id);
+}
+
+mqtt_message_t* mqtt_msg_unsubscribe_topic(mqtt_connection_t* connection, const char* topic)
+{
   if(topic == NULL || topic[0] == '\0')
-    return fail_message(connection);
-
-  if((*message_id = append_message_id(connection, 0)) == 0)
     return fail_message(connection);
 
   if(append_string(connection, topic, c_strlen(topic)) < 0)
     return fail_message(connection);
 
-  return fini_message(connection, MQTT_MSG_TYPE_SUBSCRIBE, 0, 1, 0);
+  return &connection->message;
+}
+
+mqtt_message_t* mqtt_msg_unsubscribe_fini(mqtt_connection_t* connection)
+{
+  return fini_message(connection, MQTT_MSG_TYPE_UNSUBSCRIBE, 0, 1, 0);
+}
+
+mqtt_message_t* mqtt_msg_unsubscribe(mqtt_connection_t* connection, const char* topic, uint16_t* message_id)
+{
+  mqtt_message_t* result;
+  
+  result = mqtt_msg_unsubscribe_init(connection, message_id);
+  if (result->length != 0) {
+    result = mqtt_msg_unsubscribe_topic(connection, topic);
+  }
+  if (result->length != 0) {
+    result = mqtt_msg_unsubscribe_fini(connection);
+  }
+
+  return result;
 }
 
 mqtt_message_t* mqtt_msg_pingreq(mqtt_connection_t* connection)

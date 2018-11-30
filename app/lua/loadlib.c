@@ -19,7 +19,7 @@
 #include C_HEADER_FCNTL
 
 #ifndef LUA_CROSS_COMPILER
-#include "flash_fs.h"
+#include "vfs.h"
 #endif
 
 #include "lauxlib.h"
@@ -340,9 +340,9 @@ static int readable (const char *filename) {
 }
 #else
 static int readable (const char *filename) {
-  int f = fs_open(filename, FS_RDONLY);  /* try to open file */
-  if (f < FS_OPEN_OK) return 0;  /* open failed */
-  fs_close(f);
+  int f = vfs_open(filename, "r");  /* try to open file */
+  if (!f) return 0;  /* open failed */
+  vfs_close(f);
   return 1;
 }
 #endif
@@ -613,7 +613,7 @@ static int ll_seeall (lua_State *L) {
 
 static void setpath (lua_State *L, const char *fieldname, const char *envname,
                                    const char *def) {
-  const char *path = c_getenv(envname);
+  const char *path = NULL;  /* getenv(envname) not used in NodeMCU */;
   if (path == NULL)  /* no environment variable? */
     lua_pushstring(L, def);  /* use default */
   else {
@@ -646,6 +646,7 @@ static const lua_CFunction loaders[] =
   {loader_preload, loader_Lua, loader_C, loader_Croot, NULL};
 
 #if LUA_OPTIMIZE_MEMORY > 0
+#undef MIN_OPT_LEVEL
 #define MIN_OPT_LEVEL 1
 #include "lrodefs.h"
 const LUA_REG_TYPE lmt[] = {

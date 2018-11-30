@@ -489,6 +489,7 @@ static int luaB_newproxy (lua_State *L) {
   {LSTRKEY("xpcall"), LFUNCVAL(luaB_xpcall)}
   
 #if LUA_OPTIMIZE_MEMORY == 2
+#undef MIN_OPT_LEVEL
 #define MIN_OPT_LEVEL 2
 #include "lrodefs.h"
 const LUA_REG_TYPE base_funcs_list[] = {
@@ -711,10 +712,5 @@ static void base_open (lua_State *L) {
 
 LUALIB_API int luaopen_base (lua_State *L) {
   base_open(L);
-#if LUA_OPTIMIZE_MEMORY == 0
-  luaL_register(L, LUA_COLIBNAME, co_funcs);
-  return 2;
-#else
   return 1;
-#endif
 }

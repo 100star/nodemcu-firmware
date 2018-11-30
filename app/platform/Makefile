@@ -15,6 +15,8 @@ ifndef PDIR
 GEN_LIBS = libplatform.a
 endif
 
+STD_CFLAGS=-std=gnu11 -Wimplicit
+
 #############################################################
 # Configuration i.e. compile options etc.
 # Target specific stuff (defines etc.) goes in here!
@@ -38,10 +40,10 @@ endif
 
 INCLUDES := $(INCLUDES) -I $(PDIR)include
 INCLUDES += -I ./
-INCLUDES += -I ../wofs
 INCLUDES += -I ../spiffs
 INCLUDES += -I ../libc
 INCLUDES += -I ../lua
+INCLUDES += -I ../u8g2lib/u8g2/src/clib
 PDIR := ../$(PDIR)
 sinclude $(PDIR)Makefile
 

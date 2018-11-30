@@ -13,6 +13,9 @@
 #define  espconn_keepalive_enable(pcb)   ((pcb)->so_options |= SOF_KEEPALIVE)
 #define  espconn_keepalive_disable(pcb)   ((pcb)->so_options &= ~SOF_KEEPALIVE)
 
+#define   espconn_manual_recv_disabled(espconn)  (((espconn)->pcommon.espconn_opt & ESPCONN_MANUALRECV) != 0)
+#define   espconn_manual_recv_enabled(espconn)  (((espconn)->pcommon.espconn_opt & ESPCONN_MANUALRECV) == 0)
+
 /******************************************************************************
  * FunctionName : espconn_kill_oldest_pcb
  * Description  : A oldest incoming connection has been killed.
@@ -29,7 +32,7 @@ extern void espconn_kill_oldest_pcb(void);
  * Returns      : none
 *******************************************************************************/
 
-extern void espconn_tcp_disconnect(espconn_msg *pdiscon);
+extern void espconn_tcp_disconnect(espconn_msg *pdiscon,u8 type);
 
 /******************************************************************************
  * FunctionName : espconn_tcp_client

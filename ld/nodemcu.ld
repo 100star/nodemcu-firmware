@@ -5,7 +5,7 @@ MEMORY
   dport0_0_seg :                        org = 0x3FF00000, len = 0x10
   dram0_0_seg :                         org = 0x3FFE8000, len = 0x14000
   iram1_0_seg :                         org = 0x40100000, len = 0x8000
-  irom0_0_seg :                         org = 0x40210000, len = 0x80000
+  irom0_0_seg :                         org = 0x40210000, len = 0xE0000
 }
 
 PHDRS
@@ -71,58 +71,71 @@ SECTIONS
     _dport0_data_end = ABSOLUTE(.);
   } >dport0_0_seg :dport0_0_phdr
 
-  .irom0.text : ALIGN(4)
+  .text : ALIGN(4)
   {
-    _irom0_text_start = ABSOLUTE(.);
-    *(.irom0.literal .irom.literal .irom.text.literal .irom0.text .irom.text)
-    *(.literal.* .text.*)
-    *(.rodata*)
-    *(.sdk.version)
+    _stext = .;
+    _text_start = ABSOLUTE(.);
+    *(.UserEnter.text)
+    . = ALIGN(16);
+    *(.DebugExceptionVector.text)
+    . = ALIGN(16);
+    *(.NMIExceptionVector.text)
+    . = ALIGN(16);
+    *(.KernelExceptionVector.text)
+    LONG(0)
+    LONG(0)
+    LONG(0)
+    LONG(0)
+    . = ALIGN(16);
+    *(.UserExceptionVector.text)
+    LONG(0)
+    LONG(0)
+    LONG(0)
+    LONG(0)
+    . = ALIGN(16);
+    *(.DoubleExceptionVector.text)
+    LONG(0)
+    LONG(0)
+    LONG(0)
+    LONG(0)
+    . = ALIGN (16);
+    *(.entry.text)
+    *(.init.literal)
+    *(.init)
+    
+    /* SDK libraries that used in bootup process, interruption handling
+     * and other ways where flash cache (iROM) is unavailable: */
+    *libmain.a:*(.literal .literal.* .text .text.*)
+    *libnet80211.a:*(.literal .text)
+    *libphy.a:*(.literal .text)
+    *libpp.a:*(.literal .text)
+    *libgcc.a:*(.literal .text)
+    
+    /* Following SDK libraries have .text sections, but not included in iRAM: */
+    /* *libat.a:*(.literal .text) - not used anywhere in NodeMCU */
+    /* *libcrypto.a:*(.literal .text) - tested that safe to keep in iROM */
+    /* *libdriver.a:*(.literal .text) - not used anywhere in NodeMCU */
+    /* *libespnow.a:*(.literal .text) - not used anywhere in NodeMCU */
+    /* *liblwip_536.a:*(.literal .text) - source-based library used instead */
+    /* *libpwm.a:*(.literal .text) - our own implementation used instead */
+    /* *libwpa.a:*(.literal .text) - tested that safe to keep in iROM */
+    /* *libwps.a:*(.literal .text) - tested that safe to keep in iROM */
 
-    /* These are *only* pulled in by Lua, and therefore safe to put in flash */
-    */libc.a:lib_a-isalnum.o(.text* .literal*)
-    */libc.a:lib_a-isalpha.o(.text* .literal*)
-    */libc.a:lib_a-iscntrl.o(.text* .literal*)
-    */libc.a:lib_a-isspace.o(.text* .literal*)
-    */libc.a:lib_a-islower.o(.text* .literal*)
-    */libc.a:lib_a-isupper.o(.text* .literal*)
-    */libc.a:lib_a-ispunct.o(.text* .literal*)
-    */libc.a:lib_a-isxdigit.o(.text* .literal*)
-    */libc.a:lib_a-locale.o(.text* .literal*)
-    */libc.a:lib_a-tolower.o(.text* .literal*)
-    */libc.a:lib_a-toupper.o(.text* .literal*)
-    */libc.a:lib_a-strcasecmp.o(.text* .literal*)
-    */libc.a:lib_a-strcoll.o(.text* .literal*)
-    */libc.a:lib_a-strchr.o(.text* .literal*)
-    */libc.a:lib_a-strrchr.o(.text* .literal*)
-    */libc.a:lib_a-strcat.o(.text* .literal*)
-    */libc.a:lib_a-strncat.o(.text* .literal*)
-    */libc.a:lib_a-strcspn.o(.text* .literal*)
-    */libc.a:lib_a-strtol.o(.text* .literal*)
-    */libc.a:lib_a-strtoul.o(.text* .literal*)
-    */libc.a:lib_a-strpbrk.o(.text* .literal*)
-    */libc.a:lib_a-memchr.o(.text* .literal*)
-    */libc.a:lib_a-setjmp.o(.text* .literal*)
-    /* end Lua C lib functions */
+    *(.iram.text .iram0.text .iram0.text.*)
 
-    _irom0_text_end = ABSOLUTE(.);
-    _flash_used_end = ABSOLUTE(.);
-  } >irom0_0_seg :irom0_0_phdr
+    *(.stub .gnu.warning .gnu.linkonce.literal.* .gnu.linkonce.t.*.literal .gnu.linkonce.t.*)
+    
+    *(.fini.literal)
+    *(.fini)
+    *(.gnu.version)
+    _text_end = ABSOLUTE(.);
+    _etext = .;
+  } >iram1_0_seg :iram1_0_phdr
 
   .data : ALIGN(4)
   {
     _data_start = ABSOLUTE(.);
     *(.data)
-
-    /* Hook for randomizing TCP start numbers */
-    . = ALIGN(2);
-    _tcp_new_port_port = ABSOLUTE(.);
-    */liblwip.a:tcp.o(.port)
-    /* Verify that the LWIP source has been patched as needed, or fail with
-     * a divide by zero error (../ld/nodemcu.ld:xxx / by zero) */
-    _tcp_new_port_port_size = ABSOLUTE(.) - _tcp_new_port_port;
-    _ensure_tcp_port_randomization_fix_presence = 1 / _tcp_new_port_port_size;
-
     *(.data.*)
     *(.gnu.linkonce.d.*)
     *(.data1)
@@ -139,6 +152,9 @@ SECTIONS
   .rodata : ALIGN(4)
   {
     _rodata_start = ABSOLUTE(.);
+
+    *(.rodata.dram .rodata.dram*)
+
     *(.gnu.linkonce.r.*)
     __XT_EXCEPTION_TABLE__ = ABSOLUTE(.);
     *(.xt_except_table)
@@ -190,50 +206,11 @@ SECTIONS
     *(COMMON)
     . = ALIGN (8);
     _bss_end = ABSOLUTE(.);
+    *(.noinit)
     _heap_start = ABSOLUTE(.);
 /*    _stack_sentry = ALIGN(0x8); */
   } >dram0_0_seg :dram0_0_bss_phdr
 /* __stack = 0x3ffc8000; */
-
-  .text : ALIGN(4)
-  {
-    _stext = .;
-    _text_start = ABSOLUTE(.);
-    *(.UserEnter.text)
-    . = ALIGN(16);
-    *(.DebugExceptionVector.text)
-    . = ALIGN(16);
-    *(.NMIExceptionVector.text)
-    . = ALIGN(16);
-    *(.KernelExceptionVector.text)
-    LONG(0)
-    LONG(0)
-    LONG(0)
-    LONG(0)
-    . = ALIGN(16);
-    *(.UserExceptionVector.text)
-    LONG(0)
-    LONG(0)
-    LONG(0)
-    LONG(0)
-    . = ALIGN(16);
-    *(.DoubleExceptionVector.text)
-    LONG(0)
-    LONG(0)
-    LONG(0)
-    LONG(0)
-    . = ALIGN (16);
-    *(.entry.text)
-    *(.init.literal)
-    *(.init)
-    *(.literal .text .stub .gnu.warning .gnu.linkonce.literal.* .gnu.linkonce.t.*.literal .gnu.linkonce.t.*)
-    *(.iram0.text)
-    *(.fini.literal)
-    *(.fini)
-    *(.gnu.version)
-    _text_end = ABSOLUTE(.);
-    _etext = .;
-  } >iram1_0_seg :iram1_0_phdr
 
   .lit4 : ALIGN(4)
   {
@@ -244,6 +221,37 @@ SECTIONS
     _lit4_end = ABSOLUTE(.);
   } >iram1_0_seg :iram1_0_phdr
 
+  .irom0.text : ALIGN(0x1000)
+  {
+    _irom0_text_start = ABSOLUTE(.);
+    *(.servercert.flash)
+    *(.clientcert.flash)
+    *(.irom0.literal .irom.literal .irom.text.literal .irom0.text .irom.text)
+    *(.literal .text .literal.* .text.*)
+    *(.rodata*)
+    *(.sdk.version)
+
+    /* Link-time arrays containing the defs for the included modules */
+    . = ALIGN(4);
+    lua_libs_base = ABSOLUTE(.);
+    /* Allow either empty define or defined-to-1 to include the module */
+    KEEP(*(.lua_libs))
+    LONG(0) LONG(0) /* Null-terminate the array */
+    lua_rotable_base = ABSOLUTE(.);
+    KEEP(*(.lua_rotable))
+    LONG(0) LONG(0) /* Null-terminate the array */
+
+    /* SDK doesn't use libc functions, and are therefore safe to put in flash */ 
+    */libc.a:*.o(.text* .literal*)
+    /* end libc functions */
+
+    /* Reserved areas, flash page aligned and last */
+    . = ALIGN(4096);
+    KEEP(*(.irom.reserved .irom.reserved.*))
+
+    _irom0_text_end = ABSOLUTE(.);
+    _flash_used_end = ABSOLUTE(.);
+  } >irom0_0_seg :irom0_0_phdr =0xffffffff
 }
 
 /* get ROM code address */

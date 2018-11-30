@@ -41,7 +41,7 @@ LUA_NUMBER luai_ipow(LUA_NUMBER a, LUA_NUMBER b) {
     LUA_NUMBER c = 1;
     for (;;) {
       if (b & 1)
-	c *= a;
+	      c *= a;
       b = b >> 1;
       if (b == 0)
 	return c;
@@ -292,8 +292,9 @@ int luaV_equalval (lua_State *L, const TValue *t1, const TValue *t2) {
     case LUA_TNIL: return 1;
     case LUA_TNUMBER: return luai_numeq(nvalue(t1), nvalue(t2));
     case LUA_TBOOLEAN: return bvalue(t1) == bvalue(t2);  /* true must be 1 !! */
-    case LUA_TLIGHTUSERDATA: 
     case LUA_TROTABLE:
+      return rvalue(t1) == rvalue(t2);
+    case LUA_TLIGHTUSERDATA: 
     case LUA_TLIGHTFUNCTION:
       return pvalue(t1) == pvalue(t2);
     case LUA_TUSERDATA: {
@@ -319,22 +320,25 @@ void luaV_concat (lua_State *L, int total, int last) {
   lu_mem max_sizet = MAX_SIZET;
   if (G(L)->memlimit < max_sizet) max_sizet = G(L)->memlimit;
   do {
+    /* Any call which does a memory allocation may trim the stack,
+       invalidating top unless the stack is fixed duri  ng the allocation */ 
     StkId top = L->base + last + 1;
+    fixedstack(L);
     int n = 2;  /* number of elements handled in this pass (at least 2) */
     if (!(ttisstring(top-2) || ttisnumber(top-2)) || !tostring(L, top-1)) {
+      unfixedstack(L);
       if (!call_binTM(L, top-2, top-1, top-2, TM_CONCAT)) {
         /* restore 'top' pointer, since stack might have been reallocted */
         top = L->base + last + 1;
         luaG_concaterror(L, top-2, top-1);
       }
-    } else if (tsvalue(top-1)->len == 0)  /* second op is empty? */
+    } else if (tsvalue(top-1)->len == 0) { /* second op is empty? */
       (void)tostring(L, top - 2);  /* result is first op (as string) */
-    else {
+    } else {
       /* at least two string values; get as many as possible */
       size_t tl = tsvalue(top-1)->len;
       char *buffer;
       int i;
-      fixedstack(L);
       /* collect total length */
       for (n = 1; n < total && tostring(L, top-n-1); n++) {
         size_t l = tsvalue(top-n-1)->len;
@@ -351,10 +355,10 @@ void luaV_concat (lua_State *L, int total, int last) {
       }
       setsvalue2s(L, top-n, luaS_newlstr(L, buffer, tl));
       luaZ_resetbuffer(&G(L)->buff);
-      unfixedstack(L);
     }
     total -= n-1;  /* got `n' strings to create 1 new */
     last -= n-1;
+    unfixedstack(L);
   } while (total > 1);  /* repeat until only 1 result left */
 }
 
@@ -756,7 +760,6 @@ void luaV_execute (lua_State *L, int nexeccalls) {
         fixedstack(L);
         if (n == 0) {
           n = cast_int(L->top - ra) - 1;
-          L->top = L->ci->top;
         }
         if (c == 0) c = cast_int(*pc++);
         runtime_check(L, ttistable(ra));
@@ -769,6 +772,7 @@ void luaV_execute (lua_State *L, int nexeccalls) {
           setobj2t(L, luaH_setnum(L, h, last--), val);
           luaC_barriert(L, h, val);
         }
+	L->top = L->ci->top;
         unfixedstack(L);
         continue;
       }

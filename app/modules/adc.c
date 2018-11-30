@@ -1,11 +1,8 @@
 // Module for interfacing with adc
 
-//#include "lua.h"
-#include "lualib.h"
+#include "module.h"
 #include "lauxlib.h"
 #include "platform.h"
-#include "auxmods.h"
-#include "lrotable.h"
 
 #include "c_types.h"
 #include "user_interface.h"
@@ -27,27 +24,50 @@ static int adc_readvdd33( lua_State* L )
   return 1;
 }
 
-// Module function map
-#define MIN_OPT_LEVEL 2
-#include "lrodefs.h"
-const LUA_REG_TYPE adc_map[] = 
+// Lua: adc.force_init_mode(x)
+static int adc_init107( lua_State *L )
 {
-  { LSTRKEY( "read" ), LFUNCVAL( adc_sample ) },
-  { LSTRKEY( "readvdd33" ), LFUNCVAL( adc_readvdd33) },
-#if LUA_OPTIMIZE_MEMORY > 0
+  uint8_t byte107 = luaL_checkinteger (L, 1);
 
-#endif
+  uint32 init_sector = flash_rom_get_sec_num () - 4;
+
+  // Note 32bit alignment so we can safely cast to uint32 for the flash api
+  char init_data[SPI_FLASH_SEC_SIZE] __attribute__((aligned(4)));
+
+  if (SPI_FLASH_RESULT_OK != flash_read (
+    init_sector * SPI_FLASH_SEC_SIZE,
+    (uint32 *)init_data, sizeof(init_data)))
+      return luaL_error(L, "flash read error");
+
+  // If it's already the correct value, we don't need to force it
+  if (init_data[107] == byte107)
+  {
+    lua_pushboolean (L, false);
+    return 1;
+  }
+
+  // Nope, it differs, we need to rewrite it
+  init_data[107] = byte107;
+  if (SPI_FLASH_RESULT_OK != flash_erase (init_sector))
+    return luaL_error(L, "flash erase error");
+
+  if (SPI_FLASH_RESULT_OK != flash_write (
+    init_sector * SPI_FLASH_SEC_SIZE,
+    (uint32 *)init_data, sizeof(init_data)))
+      return luaL_error(L, "flash write error");
+
+  lua_pushboolean (L, true);
+  return 1;
+}
+
+// Module function map
+static const LUA_REG_TYPE adc_map[] = {
+  { LSTRKEY( "read" ),      LFUNCVAL( adc_sample ) },
+  { LSTRKEY( "readvdd33" ), LFUNCVAL( adc_readvdd33 ) },
+  { LSTRKEY( "force_init_mode" ), LFUNCVAL( adc_init107 ) },
+  { LSTRKEY( "INIT_ADC" ),  LNUMVAL( 0x00 ) },
+  { LSTRKEY( "INIT_VDD33" ),LNUMVAL( 0xff ) },
   { LNILKEY, LNILVAL }
 };
 
-LUALIB_API int luaopen_adc( lua_State *L )
-{
-#if LUA_OPTIMIZE_MEMORY > 0
-  return 0;
-#else // #if LUA_OPTIMIZE_MEMORY > 0
-  luaL_register( L, AUXLIB_ADC, adc_map );
-  // Add constants
-
-  return 1;
-#endif // #if LUA_OPTIMIZE_MEMORY > 0  
-}
+NODEMCU_MODULE(ADC, "adc", adc_map, NULL);

@@ -1,8 +1,6 @@
-#include "lualib.h"
+#include "module.h"
 #include "lauxlib.h"
 #include "platform.h"
-#include "auxmods.h"
-#include "lrotable.h"
 #include "c_stdlib.h"
 #include "c_string.h"
 
@@ -23,7 +21,7 @@ static struct {
     int16_t  MD;
 } bmp085_data;
 
-static uint8_t ICACHE_FLASH_ATTR r8u(uint32_t id, uint8_t reg) {
+static uint8_t r8u(uint32_t id, uint8_t reg) {
     uint8_t ret;
 
     platform_i2c_send_start(id);
@@ -37,32 +35,18 @@ static uint8_t ICACHE_FLASH_ATTR r8u(uint32_t id, uint8_t reg) {
     return ret;
 }
 
-static uint16_t ICACHE_FLASH_ATTR r16u(uint32_t id, uint8_t reg) {
+static uint16_t r16u(uint32_t id, uint8_t reg) {
     uint8_t high = r8u(id, reg);
     uint8_t low  = r8u(id, reg + 1);
     return (high << 8) | low;
 }
 
-static int16_t ICACHE_FLASH_ATTR r16(uint32_t id, uint8_t reg) {
+static int16_t r16(uint32_t id, uint8_t reg) {
     return (int16_t) r16u(id, reg);
 }
 
-static int ICACHE_FLASH_ATTR bmp085_init(lua_State* L) {
-    uint32_t sda;
-    uint32_t scl;
-
-    if (!lua_isnumber(L, 1) || !lua_isnumber(L, 2)) {
-        return luaL_error(L, "wrong arg range");
-    }
-
-    sda = luaL_checkinteger(L, 1);
-    scl = luaL_checkinteger(L, 2);
-
-    if (scl == 0 || sda == 0) {
-        return luaL_error(L, "no i2c for D0");
-    }
-
-    platform_i2c_setup(bmp085_i2c_id, sda, scl, PLATFORM_I2C_SPEED_SLOW);
+static int bmp085_setup(lua_State* L) {
+    (void)L;
 
     bmp085_data.AC1 = r16(bmp085_i2c_id, 0xAA);
     bmp085_data.AC2 = r16(bmp085_i2c_id, 0xAC);
@@ -76,7 +60,7 @@ static int ICACHE_FLASH_ATTR bmp085_init(lua_State* L) {
     bmp085_data.MC  = r16(bmp085_i2c_id, 0xBC);
     bmp085_data.MD  = r16(bmp085_i2c_id, 0xBE);
 
-    return 1;
+    return 0;
 }
 
 static uint32_t bmp085_temperature_raw_b5(void) {
@@ -98,16 +82,16 @@ static uint32_t bmp085_temperature_raw_b5(void) {
     return X1 + X2;
 }
 
-static int16_t ICACHE_FLASH_ATTR bmp085_temperature(void) {
+static int16_t bmp085_temperature(void) {
     return (bmp085_temperature_raw_b5() + 8) >> 4;
 }
 
-static int ICACHE_FLASH_ATTR bmp085_lua_temperature(lua_State* L) {
+static int bmp085_lua_temperature(lua_State* L) {
     lua_pushinteger(L, bmp085_temperature());
     return 1;
 }
 
-static int32_t ICACHE_FLASH_ATTR bmp085_pressure_raw(int oss) {
+static int32_t bmp085_pressure_raw(int oss) {
     int32_t p;
     int32_t p1, p2, p3;
 
@@ -130,11 +114,11 @@ static int32_t ICACHE_FLASH_ATTR bmp085_pressure_raw(int oss) {
     p3 = r8u(bmp085_i2c_id, 0xF8);
     p = (p1 << 16) | (p2 << 8) | p3;
     p = p >> (8 - oss);
- 
+
     return p;
 }
 
-static int ICACHE_FLASH_ATTR bmp085_lua_pressure_raw(lua_State* L) {
+static int bmp085_lua_pressure_raw(lua_State* L) {
     uint8_t oss = 0;
     int32_t p;
 
@@ -150,7 +134,7 @@ static int ICACHE_FLASH_ATTR bmp085_lua_pressure_raw(lua_State* L) {
     return 1;
 }
 
-static int ICACHE_FLASH_ATTR bmp085_lua_pressure(lua_State* L) {
+static int bmp085_lua_pressure(lua_State* L) {
     uint8_t oss = 0;
     int32_t p;
     int32_t X1, X2, X3, B3, B4, B5, B6, B7;
@@ -161,7 +145,7 @@ static int ICACHE_FLASH_ATTR bmp085_lua_pressure(lua_State* L) {
             oss = 3;
         }
     }
- 
+
     p = bmp085_pressure_raw(oss);
     B5 = bmp085_temperature_raw_b5();
 
@@ -185,19 +169,12 @@ static int ICACHE_FLASH_ATTR bmp085_lua_pressure(lua_State* L) {
     return 1;
 }
 
-#define MIN_OPT_LEVEL 2
-#include "lrodefs.h"
-const LUA_REG_TYPE bmp085_map[] =
-{
-    { LSTRKEY( "temperature" ), LFUNCVAL( bmp085_lua_temperature )},
-    { LSTRKEY( "pressure" ), LFUNCVAL( bmp085_lua_pressure )},
+static const LUA_REG_TYPE bmp085_map[] = {
+    { LSTRKEY( "temperature" ),  LFUNCVAL( bmp085_lua_temperature )},
+    { LSTRKEY( "pressure" ),     LFUNCVAL( bmp085_lua_pressure )},
     { LSTRKEY( "pressure_raw" ), LFUNCVAL( bmp085_lua_pressure_raw )},
-    { LSTRKEY( "init" ), LFUNCVAL( bmp085_init )},
+    { LSTRKEY( "setup" ),        LFUNCVAL( bmp085_setup )},
     { LNILKEY, LNILVAL}
 };
 
-LUALIB_API int luaopen_bmp085(lua_State *L) {
-    LREGISTER(L, "bmp085", bmp085_map);
-    return 1;
-}
-
+NODEMCU_MODULE(BMP085, "bmp085", bmp085_map, NULL);
